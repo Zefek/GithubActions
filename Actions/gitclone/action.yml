@@ -1,0 +1,19 @@
+name: Clone repo
+description: Clone a repo
+inputs:
+  repo: { required: true }
+  auth: { required: true }
+  dest: { required: true }
+runs:
+  using: composite
+  steps:
+    - shell: powershell
+      env:
+        GIT_TERMINAL_PROMPT: "0"
+        GIT_AUTH: ${{ inputs.auth }}
+        REPO:     ${{ inputs.repo }}
+        DEST:     ${{ inputs.dest }}
+      run: |
+        git -c http.extraHeader="Authorization: Basic $env:GIT_AUTH" -c credential.helper= `
+            clone --depth=1 "$env:REPO" "$env:DEST"
+  
