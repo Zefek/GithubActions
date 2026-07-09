@@ -1,4 +1,4 @@
-name: Deploy configuration
+name: deployConfig
 description: Deploy configurations
 inputs:
   repo:   { required: true }
