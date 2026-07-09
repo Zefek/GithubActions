@@ -27,8 +27,8 @@ jobs:
 
       - uses: Zefek/GithubActions/Actions/deployConfig@main
         with:
-          repo:   ${{ secrets.SECRETS_REPO_NAME }}
-          auth:   ${{ secrets.SECRETS_REPO_TOKEN }}
+          repo:   ${{ vars.REPO }}
+          auth:   ${{ secrets.REPO_TOKEN }}
           dest:   ${{ runner.temp }}\secrets
           device: ${{ inputs.device_name }}
           outdir: ${{ inputs.source_dir }}
