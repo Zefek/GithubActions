@@ -1,0 +1,45 @@
+name: Arduino Build & Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:  { required: true, type: string }
+      serial_port:  { required: true, type: string }
+      device_name:  { required: true, type: string }
+      source_dir:   { required: true, type: string }
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  build:
+    runs-on: [self-hosted, iot]
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          submodules: true
+
+      - name: Initialize Arduino CLI
+        run: |
+          & "$Env:RUNNER_TOOL_CACHE\arduino-cli\arduino-cli.exe" --config-file "$Env:RUNNER_TOOL_CACHE\arduino-cli\config.yaml" core update-index
+
+      - uses: Zefek/GithubActions/Actions/deployConfig@main
+        with:
+          repo:   ${{ secrets.SECRETS_REPO_NAME }}
+          auth:   ${{ secrets.SECRETS_REPO_TOKEN }}
+          dest:   ${{ runner.temp }}\secrets
+          device: ${{ inputs.device_name }}
+          outdir: ${{ inputs.source_dir }}
+
+      - name: Compile Arduino project
+        run: |
+          & "$Env:RUNNER_TOOL_CACHE\arduino-cli\arduino-cli.exe" --config-file "$Env:RUNNER_TOOL_CACHE\arduino-cli\config.yaml" compile "${{ inputs.source_dir }}" --output-dir build --build-property "compiler.cpp.extra_flags=-DFW_VERSION=${{ github.run_number }}"
+
+      - name: Upload firmware to Arduino
+        env:
+          SERIAL_PORT: ${{ inputs.serial_port }}
+        run: |
+          if ($env:SERIAL_PORT -notmatch '^COM\d+$') { Write-Error "Invalid serial port: $env:SERIAL_PORT"; exit 1 }
+          & "$Env:RUNNER_TOOL_CACHE\arduino-cli\arduino-cli.exe" --config-file "$Env:RUNNER_TOOL_CACHE\arduino-cli\config.yaml" upload "${{ inputs.source_dir }}" --port $env:SERIAL_PORT --input-dir build
