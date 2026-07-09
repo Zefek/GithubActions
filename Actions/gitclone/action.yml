@@ -1,9 +1,11 @@
-name: Clone repo
-description: Clone a repo
+name: Deploy configuration
+description: Deploy configurations
 inputs:
-  repo: { required: true }
-  auth: { required: true }
-  dest: { required: true }
+  repo:   { required: true }
+  auth:   { required: true }
+  dest:   { required: true }
+  device: { required: true }
+  outdir: { required: true }
 runs:
   using: composite
   steps:
@@ -13,7 +15,30 @@ runs:
         GIT_AUTH: ${{ inputs.auth }}
         REPO:     ${{ inputs.repo }}
         DEST:     ${{ inputs.dest }}
+        DEVICE:   ${{ inputs.device }}
+        OUTDIR:   ${{ inputs.outdir }}
       run: |
-        git -c http.extraHeader="Authorization: Basic $env:GIT_AUTH" -c credential.helper= `
+        $ErrorActionPreference = 'Stop'
+        try  {
+          git -c http.extraHeader="Authorization: Basic $env:GIT_AUTH" -c credential.helper= `
             clone --depth=1 "$env:REPO" "$env:DEST"
+          if ($LASTEXITCODE -ne 0) { 
+            throw "git clone failed (exit $LASTEXITCODE)" 
+          }
+          $deployScript = Join-Path $env:DEST "$env:DEVICE\deploy.ps1"
+          if (-not (Test-Path $deployScript)) { 
+            throw "deploy.ps1 not found at $deployScript" 
+          }
+
+          & $deployScript -OutputDir (Join-Path $env:GITHUB_WORKSPACE $env:OUTDIR)
+          if ($LASTEXITCODE -ne 0) { 
+            throw "deploy.ps1 failed (exit $LASTEXITCODE)" 
+          }
+        }
+        finally {
+          if (Test-Path "$env:DEST") {
+            Remove-Item "$env:DEST" -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          $global:LASTEXITCODE = 0
+        }
   
