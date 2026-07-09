@@ -30,7 +30,7 @@ runs:
             throw "deploy.ps1 not found at $deployScript" 
           }
 
-          & $deployScript -OutputDir (Join-Path $env:GITHUB_WORKSPACE $env:OUTDIR)
+          & $deployScript -OutputDir $env:OUTDIR
           if ($LASTEXITCODE -ne 0) { 
             throw "deploy.ps1 failed (exit $LASTEXITCODE)" 
           }
