@@ -3,10 +3,10 @@ name: Arduino Build & Deploy
 on:
   workflow_call:
     inputs:
-      environment:  { required: true, type: string }
-      serial_port:  { required: true, type: string }
-      device_name:  { required: true, type: string }
-      source_dir:   { required: true, type: string }
+      environment:  { required: true,  type: string }
+      serial_port:  { required: false, type: string, default: '' }
+      device_name:  { required: true,  type: string }
+      source_dir:   { required: true,  type: string }
 
 permissions:
   contents: read
@@ -38,6 +38,7 @@ jobs:
           & "$Env:RUNNER_TOOL_CACHE\arduino-cli\arduino-cli.exe" --config-file "$Env:RUNNER_TOOL_CACHE\arduino-cli\config.yaml" compile "${{ inputs.source_dir }}" --output-dir build --build-property "compiler.cpp.extra_flags=-DFW_VERSION=${{ github.run_number }}"
 
       - name: Upload firmware to Arduino
+        if: ${{ inputs.serial_port != '' }}
         env:
           SERIAL_PORT: ${{ inputs.serial_port }}
         run: |
