@@ -33,14 +33,15 @@ jobs:
           device: ${{ inputs.device_name }}
           outdir: ${{ inputs.source_dir }}
 
-      - name: Compile Arduino project
-        run: |
-          & "$Env:RUNNER_TOOL_CACHE\arduino-cli\arduino-cli.exe" --config-file "$Env:RUNNER_TOOL_CACHE\arduino-cli\config.yaml" compile "${{ inputs.source_dir }}" --output-dir build --build-property "compiler.cpp.extra_flags=-DFW_VERSION=${{ github.run_number }}"
-
-      - name: Upload firmware to Arduino
-        if: ${{ inputs.serial_port != '' }}
+      - name: Compile Arduino project (and upload when port is set)
         env:
           SERIAL_PORT: ${{ inputs.serial_port }}
         run: |
-          if ($env:SERIAL_PORT -notmatch '^COM\d+$') { Write-Error "Invalid serial port: $env:SERIAL_PORT"; exit 1 }
-          & "$Env:RUNNER_TOOL_CACHE\arduino-cli\arduino-cli.exe" --config-file "$Env:RUNNER_TOOL_CACHE\arduino-cli\config.yaml" upload "${{ inputs.source_dir }}" --port $env:SERIAL_PORT --input-dir build
+          $cli = "$Env:RUNNER_TOOL_CACHE\arduino-cli\arduino-cli.exe"
+          $cliArgs = @(
+            '--config-file', "$Env:RUNNER_TOOL_CACHE\arduino-cli\config.yaml"
+            'compile', '${{ inputs.source_dir }}'
+            '--build-property', "compiler.cpp.extra_flags=-DFW_VERSION=${{ github.run_number }}"
+          )
+          if ($env:SERIAL_PORT) { $cliArgs += @('--upload', '--port', $env:SERIAL_PORT) }
+          & $cli @cliArgs
