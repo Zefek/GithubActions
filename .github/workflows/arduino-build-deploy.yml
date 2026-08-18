@@ -7,6 +7,7 @@ on:
       serial_port:  { required: false, type: string, default: '' }
       device_name:  { required: true,  type: string }
       source_dir:   { required: true,  type: string }
+      ota:          { required: false, type: boolean, default: false }
 
 permissions:
   contents: read
@@ -33,14 +34,83 @@ jobs:
           device: ${{ inputs.device_name }}
           outdir: ${{ inputs.source_dir }}
 
-      - name: Compile Arduino project
-        run: |
-          & "$Env:RUNNER_TOOL_CACHE\arduino-cli\arduino-cli.exe" --config-file "$Env:RUNNER_TOOL_CACHE\arduino-cli\config.yaml" compile "${{ inputs.source_dir }}" --output-dir build --build-property "compiler.cpp.extra_flags=-DFW_VERSION=${{ github.run_number }}"
-
-      - name: Upload firmware to Arduino
+      - name: Validate serial port
         if: ${{ inputs.serial_port != '' }}
         env:
           SERIAL_PORT: ${{ inputs.serial_port }}
         run: |
-          if ($env:SERIAL_PORT -notmatch '^COM\d+$') { Write-Error "Invalid serial port: $env:SERIAL_PORT"; exit 1 }
-          & "$Env:RUNNER_TOOL_CACHE\arduino-cli\arduino-cli.exe" --config-file "$Env:RUNNER_TOOL_CACHE\arduino-cli\config.yaml" upload "${{ inputs.source_dir }}" --port $env:SERIAL_PORT --input-dir build
+          if ($env:SERIAL_PORT -notmatch '^COM\d+$') { throw "Invalid serial port: $env:SERIAL_PORT" }
+
+      - name: Validate OTA target
+        if: ${{ inputs.ota && inputs.serial_port == '' }}
+        env:
+          FIRMWARE_TARGET_PATH: ${{ vars.FIRMWARE_TARGET_PATH }}
+          ENVIRONMENT:          ${{ inputs.environment }}
+        run: |
+          if (-not $env:FIRMWARE_TARGET_PATH) {
+            throw "Zařízení má ota: true, ale vars.FIRMWARE_TARGET_PATH není nastavená v environmentu $($env:ENVIRONMENT)"
+          }
+          if (-not (Test-Path -Path $env:FIRMWARE_TARGET_PATH -PathType Container)) {
+            throw "OTA složka $($env:FIRMWARE_TARGET_PATH) neexistuje"
+          }
+
+      - name: Compile Arduino project (and upload when port is set)
+        env:
+          SERIAL_PORT:          ${{ inputs.serial_port }}
+          SOURCE_DIR:           ${{ inputs.source_dir }}
+          FIRMWARE_TARGET_PATH: ${{ inputs.ota && vars.FIRMWARE_TARGET_PATH || '' }}
+          FW_VERSION:           ${{ github.run_number }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $cli = "$Env:RUNNER_TOOL_CACHE\arduino-cli\arduino-cli.exe"
+          $cliArgs = @(
+            '--config-file', "$Env:RUNNER_TOOL_CACHE\arduino-cli\config.yaml"
+            'compile', $env:SOURCE_DIR
+            '--build-property', "compiler.cpp.extra_flags=-DFW_VERSION=$($env:FW_VERSION)"
+          )
+
+          if ($env:SERIAL_PORT) {
+            # Flash na port – binárky se nikam neukládají, po uploadu k ničemu nejsou
+            $cliArgs += @('--upload', '--port', $env:SERIAL_PORT)
+          }
+          elseif ($env:FIRMWARE_TARGET_PATH) {
+            # Build jde rovnou do verzovaného podadresáře OTA složky (= historie buildů)
+            $cliArgs += @('--output-dir', (Join-Path $env:FIRMWARE_TARGET_PATH $env:FW_VERSION))
+          }
+
+          & $cli @cliArgs
+          if ($LASTEXITCODE -ne 0) { throw "arduino-cli skončil s kódem $LASTEXITCODE" }
+
+      - name: Publikace OTA firmware
+        if: ${{ inputs.ota && inputs.serial_port == '' }}
+        env:
+          FIRMWARE_TARGET_PATH: ${{ vars.FIRMWARE_TARGET_PATH }}
+          FW_VERSION:           ${{ github.run_number }}
+          GIT_SHA:              ${{ github.sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $version    = $env:FW_VERSION
+          $versionDir = Join-Path $env:FIRMWARE_TARGET_PATH $version
+
+          $appBin = Get-ChildItem -Path $versionDir -Filter '*.ino.bin' -File | Select-Object -First 1
+          if (-not $appBin) { throw "Application firmware (*.ino.bin) not found in $versionDir" }
+
+          $latestBin = Join-Path $env:FIRMWARE_TARGET_PATH 'firmware.bin'
+          Copy-Item -Path $appBin.FullName -Destination $latestBin -Force
+
+          $hash = (Get-FileHash -Path $latestBin -Algorithm SHA256).Hash.ToLower()
+          $size = (Get-Item $latestBin).Length
+
+          $manifest = @(
+            "version=$version"
+            "file=firmware.bin"
+            "size=$size"
+            "sha256=$hash"
+            "commit=$($env:GIT_SHA)"
+          )
+          $manifestPath = Join-Path $env:FIRMWARE_TARGET_PATH 'manifest.txt'
+          [System.IO.File]::WriteAllText($manifestPath, ($manifest -join "`n") + "`n")
+
+          Write-Host "Firmware verze $version uložen do $versionDir; OTA: $latestBin (manifest $manifestPath)"
