@@ -94,10 +94,9 @@ jobs:
             }
           }
 
-      - uses: Zefek/GithubActions/Actions/deployConfig@v1
+      - uses: Zefek/GithubActions/Actions/deployConfig@a75062847f709468931daba291681df84c05d24e
         with:
           repo:   ${{ env.REPO }}
-          auth:   ${{ secrets.REPO_TOKEN }}
           dest:   ${{ runner.temp }}\secrets
           device: ${{ inputs.device_name }}
           outdir: ${{ env.TARGET_PATH }}
