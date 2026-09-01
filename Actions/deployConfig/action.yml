@@ -2,7 +2,6 @@ name: deployConfig
 description: Deploy configurations
 inputs:
   repo:   { required: true }
-  auth:   { required: true }
   dest:   { required: true }
   device: { required: true }
   outdir: { required: true }
@@ -12,7 +11,6 @@ runs:
     - shell: powershell
       env:
         GIT_TERMINAL_PROMPT: "0"
-        GIT_AUTH: ${{ inputs.auth }}
         REPO:     ${{ inputs.repo }}
         DEST:     ${{ inputs.dest }}
         DEVICE:   ${{ inputs.device }}
@@ -20,8 +18,7 @@ runs:
       run: |
         $ErrorActionPreference = 'Stop'
         try  {
-          git -c http.extraHeader="Authorization: Basic $env:GIT_AUTH" -c credential.helper= `
-            clone --depth=1 "$env:REPO" "$env:DEST"
+          git clone --depth=1 "$env:REPO" "$env:DEST"
           if ($LASTEXITCODE -ne 0) { 
             throw "git clone failed (exit $LASTEXITCODE)" 
           }
