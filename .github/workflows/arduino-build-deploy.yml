@@ -96,20 +96,20 @@ jobs:
           $appBin = Get-ChildItem -Path $versionDir -Filter '*.ino.bin' -File | Select-Object -First 1
           if (-not $appBin) { throw "Application firmware (*.ino.bin) not found in $versionDir" }
 
-          $latestBin = Join-Path $env:FIRMWARE_TARGET_PATH 'firmware.bin'
-          Copy-Item -Path $appBin.FullName -Destination $latestBin -Force
-
-          $hash = (Get-FileHash -Path $latestBin -Algorithm SHA256).Hash.ToLower()
-          $size = (Get-Item $latestBin).Length
+          $hash = (Get-FileHash -Path $appBin.FullName -Algorithm SHA256).Hash.ToLower()
 
           $manifest = @(
             "version=$version"
-            "file=firmware.bin"
-            "size=$size"
+            "file=$version/$($appBin.Name)"
+            "size=$($appBin.Length)"
             "sha256=$hash"
             "commit=$($env:GIT_SHA)"
-          )
-          $manifestPath = Join-Path $env:FIRMWARE_TARGET_PATH 'manifest.txt'
-          [System.IO.File]::WriteAllText($manifestPath, ($manifest -join "`n") + "`n")
+          ) -join "`n"
 
-          Write-Host "Firmware verze $version uložen do $versionDir; OTA: $latestBin (manifest $manifestPath)"
+          $versionManifest = Join-Path $versionDir 'manifest.txt'
+          $rootManifest    = Join-Path $env:FIRMWARE_TARGET_PATH 'manifest.txt'
+
+          [System.IO.File]::WriteAllText($versionManifest, $manifest + "`n")
+          Copy-Item -Path $versionManifest -Destination $rootManifest -Force
+
+          Write-Host "Firmware verze $version uložen do $versionDir; OTA manifest $rootManifest -> $version/$($appBin.Name)"
