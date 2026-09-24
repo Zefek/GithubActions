@@ -26,7 +26,8 @@ jobs:
         run: |
           & "$Env:RUNNER_TOOL_CACHE\arduino-cli\arduino-cli.exe" --config-file "$Env:RUNNER_TOOL_CACHE\arduino-cli\config.yaml" core update-index
 
-      - uses: Zefek/GithubActions/Actions/deployConfig@d0f9e15e0cee0d6a5ab842556b55ac419cc4d3ac
+      - id: config
+        uses: Zefek/GithubActions/Actions/deployConfig@d0f9e15e0cee0d6a5ab842556b55ac419cc4d3ac
         with:
           repo:   ${{ vars.REPO }}
           dest:   ${{ runner.temp }}\secrets
@@ -87,6 +88,7 @@ jobs:
           FIRMWARE_TARGET_PATH: ${{ vars.FIRMWARE_TARGET_PATH }}
           FW_VERSION:           ${{ github.run_number }}
           GIT_SHA:              ${{ github.sha }}
+          CONFIG_SHA:           ${{ steps.config.outputs.config_sha }}
         run: |
           $ErrorActionPreference = 'Stop'
 
@@ -104,6 +106,7 @@ jobs:
             "size=$($appBin.Length)"
             "sha256=$hash"
             "commit=$($env:GIT_SHA)"
+            "config_commit=$($env:CONFIG_SHA)"
           ) -join "`n"
 
           $versionManifest = Join-Path $versionDir 'manifest.txt'

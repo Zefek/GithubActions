@@ -5,10 +5,15 @@ inputs:
   dest:   { required: true }
   device: { required: true }
   outdir: { required: true }
+outputs:
+  config_sha:
+    description: Commit konfiguračního repozitáře, ze kterého byla konfigurace nasazena
+    value: ${{ steps.config.outputs.config_sha }}
 runs:
   using: composite
   steps:
-    - shell: powershell
+    - id: config
+      shell: powershell
       env:
         GIT_TERMINAL_PROMPT: "0"
         REPO:     ${{ inputs.repo }}
@@ -19,9 +24,16 @@ runs:
         $ErrorActionPreference = 'Stop'
         try  {
           git clone --depth=1 "$env:REPO" "$env:DEST"
-          if ($LASTEXITCODE -ne 0) { 
-            throw "git clone failed (exit $LASTEXITCODE)" 
+          if ($LASTEXITCODE -ne 0) {
+            throw "git clone failed (exit $LASTEXITCODE)"
           }
+
+          $configSha = git -C "$env:DEST" rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) {
+            throw "git rev-parse failed (exit $LASTEXITCODE)"
+          }
+          [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "config_sha=$($configSha.Trim())`n")
+
           $deployScript = Join-Path $env:DEST "$env:DEVICE\deploy.ps1"
           if (-not (Test-Path $deployScript)) { 
             throw "deploy.ps1 not found at $deployScript" 
