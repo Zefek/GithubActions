@@ -94,7 +94,7 @@ jobs:
             }
           }
 
-      - uses: Zefek/GithubActions/Actions/deployConfig@63f14426f81476b7cb4176f0bf790ccb69781e0d
+      - uses: Zefek/GithubActions/Actions/deployConfig@ddca9f3f1a40eb20995aec1d5a9e88e305fcdb0a
         with:
           repo:   ${{ env.REPO }}
           dest:   ${{ runner.temp }}\secrets
