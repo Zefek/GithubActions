@@ -7,6 +7,7 @@ on:
       artifact_run_id: { required: true,  type: string }
       artifact_name:   { required: false, type: string, default: IoTDeployer }
       device_name:     { required: true,  type: string }
+      config_from_repo: { required: false, type: boolean, default: false }
 
 permissions:
   contents: read
@@ -24,6 +25,7 @@ jobs:
       SERVICE_NAME:    ${{ vars.SERVICE_NAME }}
       TARGET_PATH:     ${{ vars.TARGET_PATH }}
       REPO:            ${{ vars.REPO }}
+      CONFIG_FROM_REPO: ${{ inputs.config_from_repo }}
 
     steps:
       - name: Kontrola vstupů
@@ -32,7 +34,7 @@ jobs:
           if (-not $env:ARTIFACT_RUN_ID) { throw 'Chybí artifact_run_id v payloadu deploymentu.' }
           if (-not $env:SERVICE_NAME)    { throw 'Chybí proměnná prostředí SERVICE_NAME (vars.SERVICE_NAME).' }
           if (-not $env:TARGET_PATH)     { throw 'Chybí proměnná prostředí TARGET_PATH (vars.TARGET_PATH).' }
-          if (-not $env:REPO)            { throw 'Chybí proměnná prostředí REPO (vars.REPO).' }
+          if ($env:CONFIG_FROM_REPO -ne 'true' -and -not $env:REPO) { throw 'Chybí proměnná prostředí REPO (vars.REPO).' }
 
       - name: Stažení artefaktu
         uses: actions/download-artifact@v8
@@ -94,7 +96,19 @@ jobs:
             }
           }
 
+      - name: Odstranění konfigurace z adresáře nasazení
+        if: inputs.config_from_repo
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Get-ChildItem -Path $env:TARGET_PATH -Filter 'appsettings*.json' -File |
+            ForEach-Object {
+              Remove-Item $_.FullName -Force
+              Write-Host "Odstraněno: $($_.Name)"
+            }
+
       - uses: Zefek/GithubActions/Actions/deployConfig@ddca9f3f1a40eb20995aec1d5a9e88e305fcdb0a
+        if: ${{ !inputs.config_from_repo }}
         with:
           repo:   ${{ env.REPO }}
           dest:   ${{ runner.temp }}\secrets
