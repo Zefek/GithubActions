@@ -107,7 +107,7 @@ jobs:
               Write-Host "Odstraněno: $($_.Name)"
             }
 
-      - uses: Zefek/GithubActions/Actions/deployConfig@ae91973aabd2adaf18a83e820847f5bc02b7251f
+      - uses: Zefek/GithubActions/Actions/deployConfig@c1f224d631f3986512d101d3bba268f26d8a5aa3
         if: ${{ !inputs.config_from_repo }}
         with:
           repo:   ${{ env.REPO }}
